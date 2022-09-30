@@ -1,4 +1,4 @@
-# CyberpunkRPC
+# Cyberpunk2077RPC
 
 ## About
 

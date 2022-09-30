@@ -1,4 +1,4 @@
-Copyright (c) 2022 [Marco4413](https://github.com/Marco4413/CyberpunkRPC)
+Copyright (c) 2022 [Marco4413](https://github.com/Marco4413/Cyberpunk2077RPC)
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
