@@ -187,7 +187,6 @@ local function Event_OnInit()
         end
     end)
 
-    ConsoleLog(GameUI.GetMenu())
     ConsoleLog("Mod Initialized!")
     ConsoleLog("Using Application Id: ", CyberpunkRPC.applicationId)
 end
