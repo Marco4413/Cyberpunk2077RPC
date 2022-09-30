@@ -10,7 +10,7 @@ Discord** to update the Presence, to do that you'll need to **download [FSDiscor
 
 ### Requirements
 
- - CET 1.20+
+ - [CET 1.20+](https://github.com/yamashi/CyberEngineTweaks)
  - [FSDiscordRPC](https://github.com/Marco4413/FSDiscordRPC) (needed to actually update Discord)
 
 ### Why is it so complicated to use?
