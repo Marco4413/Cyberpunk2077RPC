@@ -36,7 +36,7 @@ local GameStates = {
 
 CyberpunkRPC = {
     version = "1.0",
-    gameState = GameStates.None,
+    gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
     startedAt = 0,
@@ -44,7 +44,6 @@ CyberpunkRPC = {
         rpcFile = "rpc.json",
         submitInterval = 5
     },
-    player = Game.GetPlayer(),
     applicationId = "1025361016802005022",
     activity = { },
     enums = { GameStates = GameStates }
@@ -108,24 +107,24 @@ function CyberpunkRPC:SetState(newState)
     self.gameState = newState
 end
 
-function CyberpunkRPC:GetLifePath()
-    if (self.player == nil) then return nil; end
+function CyberpunkRPC.GetLifePath(player)
+    if (player == nil) then return nil; end
     local systems = Game.GetScriptableSystemsContainer()
     local devSystem = systems:Get("PlayerDevelopmentSystem")
-    local devData = devSystem:GetDevelopmentData(self.player)
+    local devData = devSystem:GetDevelopmentData(player)
     return devData ~= nil and devData:GetLifePath().value or nil
 end
 
-function CyberpunkRPC:GetLevel()
-    if (self.player == nil) then return { level = -1, streetCred = -1 }; end
+function CyberpunkRPC.GetLevel(player)
+    if (player == nil) then return { level = -1, streetCred = -1 }; end
     local statsSystem = Game.GetStatsSystem()
-    local playerEntityId = self.player:GetEntityID()
+    local playerEntityId = player:GetEntityID()
     local level = statsSystem:GetStatValue(playerEntityId, "Level")
     local streetCred = statsSystem:GetStatValue(playerEntityId, "StreetCred")
     return { level = level or -1, streetCred = streetCred or -1 }
 end
 
-function CyberpunkRPC:GetQuest()
+function CyberpunkRPC.GetQuest()
     local res = { name = "Roaming.", objective = nil }
     local journal = Game.GetJournalManager()
 
@@ -157,15 +156,13 @@ function CyberpunkRPC:GetQuest()
     return res
 end
 
-function CyberpunkRPC:GetGender()
-    if (self.player == nil) then return nil; end
-    local genderName = self.player:GetResolvedGenderName()
+function CyberpunkRPC:GetGender(player)
+    if (player == nil) then return nil; end
+    local genderName = player:GetResolvedGenderName()
     return genderName and genderName.value or nil
 end
 
 local function Event_OnInit()
-    CyberpunkRPC.player = Game.GetPlayer()
-
     GameUI.OnSessionStart(function (state)
         CyberpunkRPC:SetState(GameStates.Playing)
     end)
@@ -190,6 +187,7 @@ local function Event_OnInit()
         end
     end)
 
+    ConsoleLog(GameUI.GetMenu())
     ConsoleLog("Mod Initialized!")
     ConsoleLog("Using Application Id: ", CyberpunkRPC.applicationId)
 end
@@ -222,33 +220,39 @@ local function Event_OnUpdate(dt)
         elseif (CyberpunkRPC.gameState == GameStates.MainMenu) then
             activity.Details = "Watching the Main Menu."
         elseif (CyberpunkRPC.gameState == GameStates.PauseMenu) then
-            local level = CyberpunkRPC:GetLevel()
-            local lifepath = CyberpunkRPC:GetLifePath()
-            activity.Details = "Game Paused."
-            activity.LargeImageKey = CyberpunkRPC:GetGender():lower()
-            activity.LargeImageText = table.concat({
-                "Level: ", level.level, "; ",
-                "Street Cred: ", level.streetCred
-            })
-            activity.SmallImageKey = lifepath:lower()
-            activity.SmallImageText = lifepath
-            activity.State = nil
+            local player = Game.GetPlayer()
+            if (player ~= nil) then
+                local level = CyberpunkRPC.GetLevel(player)
+                local lifepath = CyberpunkRPC.GetLifePath(player)
+                activity.Details = "Game Paused."
+                activity.LargeImageKey = CyberpunkRPC.GetGender(player):lower()
+                activity.LargeImageText = table.concat({
+                    "Level: ", level.level, "; ",
+                    "Street Cred: ", level.streetCred
+                })
+                activity.SmallImageKey = lifepath:lower()
+                activity.SmallImageText = lifepath
+                activity.State = nil
+            end
         elseif (CyberpunkRPC.gameState == GameStates.DeathMenu) then
             activity.Details = "Admiring the Death Menu."
             activity.State = "No Armor?"
         elseif (CyberpunkRPC.gameState == GameStates.Playing) then
-            local questInfo = CyberpunkRPC:GetQuest()
-            local level = CyberpunkRPC:GetLevel()
-            local lifepath = CyberpunkRPC:GetLifePath()
-            activity.Details = questInfo.name
-            activity.LargeImageKey = CyberpunkRPC:GetGender():lower()
-            activity.LargeImageText = table.concat({
-                "Level: ", level.level, "; ",
-                "Street Cred: ", level.streetCred
-            })
-            activity.SmallImageKey = lifepath:lower()
-            activity.SmallImageText = lifepath
-            activity.State = questInfo.objective
+            local player = Game.GetPlayer()
+            if (player ~= nil) then
+                local questInfo = CyberpunkRPC.GetQuest()
+                local level = CyberpunkRPC.GetLevel(player)
+                local lifepath = CyberpunkRPC.GetLifePath(player)
+                activity.Details = questInfo.name
+                activity.LargeImageKey = CyberpunkRPC.GetGender(player):lower()
+                activity.LargeImageText = table.concat({
+                    "Level: ", level.level, "; ",
+                    "Street Cred: ", level.streetCred
+                })
+                activity.SmallImageKey = lifepath:lower()
+                activity.SmallImageText = lifepath
+                activity.State = questInfo.objective
+            end
         end
 
         CyberpunkRPC:SetFullActivity(activity)
