@@ -24,4 +24,4 @@ it caused **random game crashes** (probably because of I/O errors on the C++ par
 
 ## Development
 
-To improve your dev experience follow the README in [libs/cet](libs/cet/README.md).
+To improve your dev experience follow the README in [libs/cet](libs/cet).
