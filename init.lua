@@ -91,17 +91,13 @@ function CyberpunkRPC:SaveConfig()
 end
 
 function CyberpunkRPC:LoadConfig()
-    local file = io.open("data/config.json", "r")
-    local configText = file:read("*a")
-    io.close(file)
-
-    local ok, config = pcall(json.decode, configText)
-    if ok then
-        self.config = config
-        return
-    end
-
-    self:SaveConfig()
+    local ok = pcall(function ()
+        local file = io.open("data/config.json", "r")
+        local configText = file:read("*a")
+        io.close(file)
+        self.config = json.decode(configText)
+    end)
+    if (not ok) then self:SaveConfig(); end
 end
 
 function CyberpunkRPC:ResetConfig()
