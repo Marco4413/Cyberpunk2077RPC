@@ -156,7 +156,7 @@ function CyberpunkRPC.GetQuest()
     return res
 end
 
-function CyberpunkRPC:GetGender(player)
+function CyberpunkRPC.GetGender(player)
     if (player == nil) then return nil; end
     local genderName = player:GetResolvedGenderName()
     return genderName and genderName.value or nil
