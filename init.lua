@@ -66,7 +66,22 @@ CyberpunkRPC = {
 ---@field PartyMax number
 
 local function ConsoleLog(...)
-    print("[ " .. os.date("%x %X") .. " ][ CyberpunkRPC ]:", table.concat({ ... }))
+    print("[ " .. os.date("%x %X") .. " ][ " .. CyberpunkRPC.name .. " ]:", table.concat({ ... }))
+end
+
+function CyberpunkRPC:SetEnabled(value)
+    self.config.enabled = value
+    if (not self.config.enabled) then
+        ConsoleLog("Disabled.")
+        self:SetActivity("ApplicationId", nil)
+        self:SubmitActivity()
+        return
+    end
+    ConsoleLog("Enabled.")
+end
+
+function CyberpunkRPC:IsEnabled()
+    return self.config.enabled
 end
 
 function CyberpunkRPC:SaveConfig()
@@ -224,13 +239,15 @@ local function Event_OnInit()
 end
 
 local function Event_OnUpdate(dt)
+    if (not CyberpunkRPC:IsEnabled()) then return; end
+
     CyberpunkRPC.elapsedInterval = CyberpunkRPC.elapsedInterval + dt
     if (CyberpunkRPC.elapsedInterval >= CyberpunkRPC.config.submitInterval) then
         CyberpunkRPC.elapsedInterval = 0
-        CyberpunkRPC:SubmitActivity()
 
-        if ((not CyberpunkRPC.config.enabled) or CyberpunkRPC.gameState == GameStates.None) then
+        if (CyberpunkRPC.gameState == GameStates.None) then
             CyberpunkRPC:SetActivity("ApplicationId", nil)
+            CyberpunkRPC:SubmitActivity()
             return
         end
 
@@ -287,6 +304,7 @@ local function Event_OnUpdate(dt)
         end
 
         CyberpunkRPC:SetFullActivity(activity)
+        CyberpunkRPC:SubmitActivity()
     end
 end
 
@@ -316,16 +334,20 @@ local function Event_OnDraw()
         end
 
         ImGui.Separator()
-        CyberpunkRPC.config.enabled = ImGui.Checkbox("Enabled", CyberpunkRPC.config.enabled)
-        CyberpunkRPC.config.submitInterval = ImGui.InputFloat("Submit Interval", CyberpunkRPC.config.submitInterval)
-        if (CyberpunkRPC.config.submitInterval < 1) then
-            CyberpunkRPC.config.submitInterval = 1
-        end
+        local newEnabled, changed = ImGui.Checkbox("Enabled", CyberpunkRPC:IsEnabled())
+        if (changed) then CyberpunkRPC:SetEnabled(newEnabled); end
 
-        local newFile, changing = ImGui.InputText("RPC File (Disable when changing)", CyberpunkRPC.config.rpcFile, 256)
-        if (changing) then
-            CyberpunkRPC.elapsedInterval = 0
-            CyberpunkRPC.config.rpcFile = newFile
+        local newInterval, changed = ImGui.InputFloat("Submit Interval", CyberpunkRPC.config.submitInterval)
+        if (changed) then CyberpunkRPC.config.submitInterval = math.max(newInterval, 1); end
+
+        if (CyberpunkRPC:IsEnabled()) then
+            ImGui.Text("RPC File (Editable if not enabled): " .. CyberpunkRPC.config.rpcFile)
+        else
+            local newFile, changing = ImGui.InputText("RPC File", CyberpunkRPC.config.rpcFile, 256)
+            if (changing) then
+                CyberpunkRPC.elapsedInterval = 0
+                CyberpunkRPC.config.rpcFile = newFile
+            end
         end
         ImGui.Separator()
 
