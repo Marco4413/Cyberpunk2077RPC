@@ -35,12 +35,15 @@ local GameStates = {
 }
 
 CyberpunkRPC = {
+    name = "CyberpunkRPC",
     version = "1.0",
     gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
     startedAt = 0,
+    showUI = false,
     config = {
+        enabled = true,
         rpcFile = "rpc.json",
         submitInterval = 5
     },
@@ -66,6 +69,35 @@ local function ConsoleLog(...)
     print("[ " .. os.date("%x %X") .. " ][ CyberpunkRPC ]:", table.concat({ ... }))
 end
 
+function CyberpunkRPC:SaveConfig()
+    local file = io.open("data/config.json", "w")
+    file:write(json.encode(self.config))
+    io.close(file)
+end
+
+function CyberpunkRPC:LoadConfig()
+    local file = io.open("data/config.json", "r")
+    local configText = file:read("*a")
+    io.close(file)
+
+    local ok, config = pcall(json.decode, configText)
+    if ok then
+        self.config = config
+        return
+    end
+
+    self:SaveConfig()
+end
+
+function CyberpunkRPC:ResetConfig()
+    self.config = {
+        enabled = true,
+        rpcFile = "rpc.json",
+        submitInterval = 5
+    }
+    self:SaveConfig()
+end
+
 function CyberpunkRPC:SetActivity(key, value)
     local oldValue = self.activity[key]
     if (oldValue ~= value) then
@@ -88,8 +120,8 @@ function CyberpunkRPC:SetFullActivity(activity)
     return changed
 end
 
-function CyberpunkRPC:SubmitActivity()
-    if (self._isActivityDirty) then
+function CyberpunkRPC:SubmitActivity(force)
+    if (force or self._isActivityDirty) then
         -- Used to ensure that an object gets serialized instead of an array
         self.activity.json = true
         ConsoleLog("Activity needs updating (", json.encode(self.activity), ")")
@@ -197,7 +229,7 @@ local function Event_OnUpdate(dt)
         CyberpunkRPC.elapsedInterval = 0
         CyberpunkRPC:SubmitActivity()
 
-        if (CyberpunkRPC.gameState == GameStates.None) then
+        if ((not CyberpunkRPC.config.enabled) or CyberpunkRPC.gameState == GameStates.None) then
             CyberpunkRPC:SetActivity("ApplicationId", nil)
             return
         end
@@ -263,11 +295,64 @@ local function Event_OnShutdown()
     CyberpunkRPC:SubmitActivity()
 end
 
+local function Event_OnDraw()
+    if (not CyberpunkRPC.showUI) then return; end
+
+    if (ImGui.Begin(CyberpunkRPC.name)) then
+        if (ImGui.Button("Save")) then
+            CyberpunkRPC:SaveConfig()
+        end
+        ImGui.SameLine()
+        if (ImGui.Button("Load")) then
+            CyberpunkRPC:LoadConfig()
+        end
+        ImGui.SameLine()
+        if (ImGui.Button("Reset")) then
+            CyberpunkRPC:ResetConfig()
+        end
+        ImGui.SameLine()
+        if (ImGui.Button("Force Submit")) then
+            CyberpunkRPC:SubmitActivity(true)
+        end
+
+        ImGui.Separator()
+        CyberpunkRPC.config.enabled = ImGui.Checkbox("Enabled", CyberpunkRPC.config.enabled)
+        CyberpunkRPC.config.submitInterval = ImGui.InputFloat("Submit Interval", CyberpunkRPC.config.submitInterval)
+        if (CyberpunkRPC.config.submitInterval < 1) then
+            CyberpunkRPC.config.submitInterval = 1
+        end
+
+        local newFile, changing = ImGui.InputText("RPC File (Disable when changing)", CyberpunkRPC.config.rpcFile, 256)
+        if (changing) then
+            CyberpunkRPC.elapsedInterval = 0
+            CyberpunkRPC.config.rpcFile = newFile
+        end
+        ImGui.Separator()
+
+        -- This may cause issues if not done only on box presses
+        local newDirt, changed = ImGui.Checkbox("Is Activity Dirty", CyberpunkRPC._isActivityDirty)
+        if (changed) then CyberpunkRPC._isActivityDirty = newDirt; end
+    end
+    ImGui.End()
+end
+
+local function Event_OnOverlayOpen()
+    CyberpunkRPC.showUI = true
+end
+
+local function Event_OnOverlayClose()
+    CyberpunkRPC.showUI = false
+end
+
 function CyberpunkRPC:Init()
+    self.startedAt = math.floor(os.time() * 1e3)
+    CyberpunkRPC:LoadConfig()
     registerForEvent("onInit", Event_OnInit)
     registerForEvent("onUpdate", Event_OnUpdate)
     registerForEvent("onShutdown", Event_OnShutdown)
-    self.startedAt = math.floor(os.time() * 1e3)
+    registerForEvent("onDraw", Event_OnDraw)
+    registerForEvent("onOverlayOpen", Event_OnOverlayOpen)
+    registerForEvent("onOverlayClose", Event_OnOverlayClose)
     return self
 end
 
