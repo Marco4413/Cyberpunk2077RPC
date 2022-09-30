@@ -1,0 +1,3 @@
+[submodule "libs/cetkit"]
+	path = libs/cetkit
+	url = https://github.com/psiberx/cp2077-cet-kit

@@ -1,0 +1,7 @@
+{
+    "Lua.runtime.version": "LuaJIT",
+    "Lua.workspace.preloadFileSize": 15360,
+    "Lua.workspace.library": [
+        "libs/cet/cet.lua",
+    ]
+}
