@@ -37,6 +37,7 @@ local GameStates = {
 CyberpunkRPC = {
     name = "CyberpunkRPC",
     version = "1.0",
+    website = "https://github.com/Marco4413/Cyberpunk2077RPC",
     gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
@@ -84,7 +85,8 @@ function CyberpunkRPC:GetDefaultConfig()
     return {
         enabled = true,
         rpcFile = "rpc.json",
-        submitInterval = 5
+        submitInterval = 5,
+        showWebsiteButton = false
     }
 end
 
@@ -291,7 +293,10 @@ local function Event_OnUpdate(dt)
             LargeImageText = "Cyberpunk 2077",
             SmallImageKey = nil,
             SmallImageText = nil,
-            State = nil
+            State = nil,
+            Buttons = CyberpunkRPC.config.showWebsiteButton and {
+                { Label = CyberpunkRPC.name .. " Website", Url = CyberpunkRPC.website }
+            } or nil
         }
 
         if (CyberpunkRPC.gameState == GameStates.Loading) then
@@ -367,6 +372,9 @@ local function Event_OnDraw()
         ImGui.Separator()
         local newEnabled, changed = ImGui.Checkbox("Enabled", CyberpunkRPC:IsEnabled())
         if (changed) then CyberpunkRPC:SetEnabled(newEnabled); end
+        
+        local newShowWebsite, changed = ImGui.Checkbox("Show Website Button", CyberpunkRPC.config.showWebsiteButton)
+        if (changed) then CyberpunkRPC.config.showWebsiteButton = newShowWebsite; end
 
         local newInterval, changed = ImGui.InputFloat("Submit Interval", CyberpunkRPC.config.submitInterval)
         if (changed) then CyberpunkRPC.config.submitInterval = math.max(newInterval, 1); end
