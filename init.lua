@@ -131,6 +131,22 @@ end
 function CyberpunkRPC:SetActivity(key, value)
     local oldValue = self.activity[key]
     if (oldValue ~= value) then
+        if (key == "Buttons" and type(oldValue) == "table" and type(value) == "table") then
+            -- If no button was added/removed we can't be sure that they're the same
+            if (#value == #oldValue) then
+                for i=1, #value do
+                    local newButton = value[i]
+                    local oldButton = oldValue[i]
+                    if (oldButton.Label ~= newButton.Label or oldButton.Url ~= newButton.Url) then
+                        self.activity[key] = value
+                        self._isActivityDirty = true
+                        return true
+                    end
+                end
+                return false
+            end
+        end
+
         self._isActivityDirty = true
         self.activity[key] = value
         return true
