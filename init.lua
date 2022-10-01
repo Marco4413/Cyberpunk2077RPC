@@ -42,11 +42,7 @@ CyberpunkRPC = {
     elapsedInterval = 0,
     startedAt = 0,
     showUI = false,
-    config = {
-        enabled = true,
-        rpcFile = "rpc.json",
-        submitInterval = 5
-    },
+    config = { },
     applicationId = "1025361016802005022",
     activity = { },
     enums = { GameStates = GameStates }
@@ -84,10 +80,32 @@ function CyberpunkRPC:IsEnabled()
     return self.config.enabled
 end
 
+function CyberpunkRPC:GetDefaultConfig()
+    return {
+        enabled = true,
+        rpcFile = "rpc.json",
+        submitInterval = 5
+    }
+end
+
 function CyberpunkRPC:SaveConfig()
     local file = io.open("data/config.json", "w")
     file:write(json.encode(self.config))
     io.close(file)
+end
+
+local function CrossCheckTypes(tbl1, tbl2)
+    local changed = false
+    for k, v in next, tbl1 do
+        local t1, t2 = type(tbl1[k]), type(tbl2[k])
+        if (t1 ~= t2) then
+            tbl2[k] = tbl1[k]
+            changed = true
+        elseif (t1 == "table") then
+            changed = CrossCheckTypes(tbl1[k], tbl2[k]) or changed
+        end
+    end
+    return changed
 end
 
 function CyberpunkRPC:LoadConfig()
@@ -95,17 +113,18 @@ function CyberpunkRPC:LoadConfig()
         local file = io.open("data/config.json", "r")
         local configText = file:read("*a")
         io.close(file)
+
+        local defaultConfig = CyberpunkRPC:GetDefaultConfig()
         self.config = json.decode(configText)
+        if (CrossCheckTypes(defaultConfig, self.config)) then
+            self:SaveConfig()
+        end
     end)
     if (not ok) then self:SaveConfig(); end
 end
 
 function CyberpunkRPC:ResetConfig()
-    self.config = {
-        enabled = true,
-        rpcFile = "rpc.json",
-        submitInterval = 5
-    }
+    self.config = self:GetDefaultConfig()
     self:SaveConfig()
 end
 
@@ -364,7 +383,8 @@ end
 
 function CyberpunkRPC:Init()
     self.startedAt = math.floor(os.time() * 1e3)
-    CyberpunkRPC:LoadConfig()
+    self.config = self:GetDefaultConfig()
+    self:LoadConfig()
     registerForEvent("onInit", Event_OnInit)
     registerForEvent("onUpdate", Event_OnUpdate)
     registerForEvent("onShutdown", Event_OnShutdown)
