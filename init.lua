@@ -88,7 +88,8 @@ function CyberpunkRPC:GetDefaultConfig()
         enabled = true,
         rpcFile = "rpc.json",
         submitInterval = 5,
-        showWebsiteButton = false
+        showWebsiteButton = false,
+        showDrivingActivity = false
     }
 end
 
@@ -358,26 +359,29 @@ local function Event_OnDraw()
         local newEnabled, changed = ImGui.Checkbox("Enabled", CyberpunkRPC:IsEnabled())
         if (changed) then CyberpunkRPC:SetEnabled(newEnabled); end
         
-        local newShowWebsite, changed = ImGui.Checkbox("Show Website Button", CyberpunkRPC.config.showWebsiteButton)
-        if (changed) then CyberpunkRPC.config.showWebsiteButton = newShowWebsite; end
+        local newValue, changed = ImGui.Checkbox("Show Website Button", CyberpunkRPC.config.showWebsiteButton)
+        if (changed) then CyberpunkRPC.config.showWebsiteButton = newValue; end
 
-        local newInterval, changed = ImGui.DragFloat("Submit Interval", CyberpunkRPC.config.submitInterval, 0.01, 1, 3600, "%.2f")
-        if (changed) then CyberpunkRPC.config.submitInterval = math.max(newInterval, 1); end
+        local newValue, changed = ImGui.DragFloat("Submit Interval", CyberpunkRPC.config.submitInterval, 0.01, 1, 3600, "%.2f")
+        if (changed) then CyberpunkRPC.config.submitInterval = math.max(newValue, 1); end
 
         if (CyberpunkRPC:IsEnabled()) then
             ImGui.Text("RPC File (Editable if not enabled): " .. CyberpunkRPC.config.rpcFile)
         else
-            local newFile, changing = ImGui.InputText("RPC File", CyberpunkRPC.config.rpcFile, 256)
+            local newValue, changing = ImGui.InputText("RPC File", CyberpunkRPC.config.rpcFile, 256)
             if (changing) then
                 CyberpunkRPC.elapsedInterval = 0
-                CyberpunkRPC.config.rpcFile = newFile
+                CyberpunkRPC.config.rpcFile = newValue
             end
         end
+        
+        local newValue, changed = ImGui.Checkbox("Show Driving Activity", CyberpunkRPC.config.showDrivingActivity)
+        if (changed) then CyberpunkRPC.config.showDrivingActivity = newValue; end
         ImGui.Separator()
 
         -- This may cause issues if not done only on box presses
-        local newDirt, changed = ImGui.Checkbox("Is Activity Dirty", CyberpunkRPC._isActivityDirty)
-        if (changed) then CyberpunkRPC._isActivityDirty = newDirt; end
+        local newValue, changed = ImGui.Checkbox("Is Activity Dirty", CyberpunkRPC._isActivityDirty)
+        if (changed) then CyberpunkRPC._isActivityDirty = newValue; end
     end
     ImGui.End()
 end
@@ -431,6 +435,37 @@ local function Handler_DeathMenu(self, activity)
     end
 end
 
+local function Handler_Driving(self, activity)
+    if (not self.config.showDrivingActivity) then return; end
+    if (self.gameState == GameStates.Playing and self.player ~= nil) then
+        local vehicle = Game.GetMountedVehicle(self.player)
+        if (vehicle ~= nil and vehicle:IsPlayerDriver()) then
+            local level = self.GetLevel(self.player)
+            local lifepath = self.GetLifePath(self.player)
+            local vehicleName = vehicle:GetDisplayName()
+            local vehicleSpeed = math.floor(vehicle:GetCurrentSpeed() * 3.6 + .5)
+            
+            activity.Details = "Driving " .. vehicleName .. "."
+            activity.LargeImageKey = self.GetGender(self.player):lower()
+            activity.LargeImageText = table.concat({
+                "Level: ", level.level, "; ",
+                "Street Cred: ", level.streetCred
+            })
+            activity.SmallImageKey = lifepath:lower()
+            activity.SmallImageText = lifepath
+
+            if (vehicleSpeed > 0) then
+                activity.State = "Cruising at " .. vehicleSpeed .. "km/h"
+            elseif (vehicleSpeed < 0) then
+                activity.State = "Going backwards at " .. -vehicleSpeed .. "km/h"
+            else
+                activity.State = "Currently parked."
+            end
+            return true
+        end
+    end
+end
+
 local function Handler_Playing(self, activity)
     if (self.gameState == GameStates.Playing) then
         if (self.player ~= nil) then
@@ -457,6 +492,7 @@ function CyberpunkRPC:Init()
     self:LoadConfig()
 
     self:AddActivityHandler(Handler_Playing)
+    self:AddActivityHandler(Handler_Driving)
     self:AddActivityHandler(Handler_DeathMenu)
     self:AddActivityHandler(Handler_PauseMenu)
     self:AddActivityHandler(Handler_MainMenu)
