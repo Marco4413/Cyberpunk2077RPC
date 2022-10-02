@@ -361,7 +361,7 @@ local function Event_OnDraw()
         local newShowWebsite, changed = ImGui.Checkbox("Show Website Button", CyberpunkRPC.config.showWebsiteButton)
         if (changed) then CyberpunkRPC.config.showWebsiteButton = newShowWebsite; end
 
-        local newInterval, changed = ImGui.InputFloat("Submit Interval", CyberpunkRPC.config.submitInterval)
+        local newInterval, changed = ImGui.DragFloat("Submit Interval", CyberpunkRPC.config.submitInterval, 0.01, 1, 3600, "%.2f")
         if (changed) then CyberpunkRPC.config.submitInterval = math.max(newInterval, 1); end
 
         if (CyberpunkRPC:IsEnabled()) then
