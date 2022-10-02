@@ -409,20 +409,19 @@ local function Handler_MainMenu(self, activity)
 end
 
 local function Handler_PauseMenu(self, activity)
-    if (self.gameState == GameStates.PauseMenu) then
-        if (self.player ~= nil) then
-            local level = self.GetLevel(self.player)
-            local lifepath = self.GetLifePath(self.player)
-            activity.Details = "Game Paused."
-            activity.LargeImageKey = self.GetGender(self.player):lower()
-            activity.LargeImageText = table.concat({
-                "Level: ", level.level, "; ",
-                "Street Cred: ", level.streetCred
-            })
-            activity.SmallImageKey = lifepath:lower()
-            activity.SmallImageText = lifepath
-            activity.State = nil
-        end
+    if (self.gameState == GameStates.PauseMenu and self.player ~= nil) then
+        local level = self.GetLevel(self.player)
+        local lifepath = self.GetLifePath(self.player)
+
+        activity.Details = "Game Paused."
+        activity.LargeImageKey = self.GetGender(self.player):lower()
+        activity.LargeImageText = table.concat({
+            "Level: ", level.level, "; ",
+            "Street Cred: ", level.streetCred
+        })
+        activity.SmallImageKey = lifepath:lower()
+        activity.SmallImageText = lifepath
+        activity.State = nil
         return true
     end
 end
@@ -467,21 +466,20 @@ local function Handler_Driving(self, activity)
 end
 
 local function Handler_Playing(self, activity)
-    if (self.gameState == GameStates.Playing) then
-        if (self.player ~= nil) then
-            local questInfo = self.GetQuest()
-            local level = self.GetLevel(self.player)
-            local lifepath = self.GetLifePath(self.player)
-            activity.Details = questInfo.name
-            activity.LargeImageKey = self.GetGender(self.player):lower()
-            activity.LargeImageText = table.concat({
-                "Level: ", level.level, "; ",
-                "Street Cred: ", level.streetCred
-            })
-            activity.SmallImageKey = lifepath:lower()
-            activity.SmallImageText = lifepath
-            activity.State = questInfo.objective
-        end
+    if (self.gameState == GameStates.Playing and self.player ~= nil) then
+        local questInfo = self.GetQuest()
+        local level = self.GetLevel(self.player)
+        local lifepath = self.GetLifePath(self.player)
+
+        activity.Details = questInfo.name
+        activity.LargeImageKey = self.GetGender(self.player):lower()
+        activity.LargeImageText = table.concat({
+            "Level: ", level.level, "; ",
+            "Street Cred: ", level.streetCred
+        })
+        activity.SmallImageKey = lifepath:lower()
+        activity.SmallImageText = lifepath
+        activity.State = questInfo.objective
         return true
     end
 end
