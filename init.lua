@@ -34,10 +34,11 @@ local GameStates = {
     Loading = 5
 }
 
-CyberpunkRPC = {
+local CyberpunkRPC = {
     name = "CyberpunkRPC",
     version = "1.0",
     website = "https://github.com/Marco4413/Cyberpunk2077RPC",
+    player = Game.GetPlayer(), -- Only available in Activity Handlers
     gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
@@ -46,7 +47,8 @@ CyberpunkRPC = {
     config = { },
     applicationId = "1025361016802005022",
     activity = { },
-    enums = { GameStates = GameStates }
+    GameStates = GameStates,
+    _handlers = { }
 }
 
 ---@class Activity
@@ -242,6 +244,22 @@ function CyberpunkRPC.GetGender(player)
     return genderName and genderName.value or nil
 end
 
+---@param handler fun(self:CyberpunkRPC, activity:Activity):boolean|nil
+function CyberpunkRPC:AddActivityHandler(handler)
+    table.insert(self._handlers, 1, handler)
+    return handler
+end
+
+---@param handler function
+function CyberpunkRPC:RemoveActivityHandler(handler)
+    for i=1, #self._handlers do
+        if (self._handlers[i] == handler) then
+            table.remove(self._handlers, i)
+            break
+        end
+    end
+end
+
 local function Event_OnInit()
     GameUI.OnSessionStart(function (state)
         CyberpunkRPC:SetState(GameStates.Playing)
@@ -299,43 +317,10 @@ local function Event_OnUpdate(dt)
             } or nil
         }
 
-        if (CyberpunkRPC.gameState == GameStates.Loading) then
-            activity.Details = "Loading..."
-        elseif (CyberpunkRPC.gameState == GameStates.MainMenu) then
-            activity.Details = "Watching the Main Menu."
-        elseif (CyberpunkRPC.gameState == GameStates.PauseMenu) then
-            local player = Game.GetPlayer()
-            if (player ~= nil) then
-                local level = CyberpunkRPC.GetLevel(player)
-                local lifepath = CyberpunkRPC.GetLifePath(player)
-                activity.Details = "Game Paused."
-                activity.LargeImageKey = CyberpunkRPC.GetGender(player):lower()
-                activity.LargeImageText = table.concat({
-                    "Level: ", level.level, "; ",
-                    "Street Cred: ", level.streetCred
-                })
-                activity.SmallImageKey = lifepath:lower()
-                activity.SmallImageText = lifepath
-                activity.State = nil
-            end
-        elseif (CyberpunkRPC.gameState == GameStates.DeathMenu) then
-            activity.Details = "Admiring the Death Menu."
-            activity.State = "No Armor?"
-        elseif (CyberpunkRPC.gameState == GameStates.Playing) then
-            local player = Game.GetPlayer()
-            if (player ~= nil) then
-                local questInfo = CyberpunkRPC.GetQuest()
-                local level = CyberpunkRPC.GetLevel(player)
-                local lifepath = CyberpunkRPC.GetLifePath(player)
-                activity.Details = questInfo.name
-                activity.LargeImageKey = CyberpunkRPC.GetGender(player):lower()
-                activity.LargeImageText = table.concat({
-                    "Level: ", level.level, "; ",
-                    "Street Cred: ", level.streetCred
-                })
-                activity.SmallImageKey = lifepath:lower()
-                activity.SmallImageText = lifepath
-                activity.State = questInfo.objective
+        CyberpunkRPC.player = Game.GetPlayer()
+        for i=1, #CyberpunkRPC._handlers do
+            if (CyberpunkRPC._handlers[i](CyberpunkRPC, activity)) then
+                break
             end
         end
 
@@ -405,10 +390,78 @@ local function Event_OnOverlayClose()
     CyberpunkRPC.showUI = false
 end
 
+local function Handler_Loading(self, activity)
+    if (self.gameState == GameStates.Loading) then
+        activity.Details = "Loading..."
+        return true
+    end
+end
+
+local function Handler_MainMenu(self, activity)
+    if (self.gameState == GameStates.MainMenu) then
+        activity.Details = "Watching the Main Menu."
+        return true
+    end
+end
+
+local function Handler_PauseMenu(self, activity)
+    if (self.gameState == GameStates.PauseMenu) then
+        if (self.player ~= nil) then
+            local level = self.GetLevel(self.player)
+            local lifepath = self.GetLifePath(self.player)
+            activity.Details = "Game Paused."
+            activity.LargeImageKey = self.GetGender(self.player):lower()
+            activity.LargeImageText = table.concat({
+                "Level: ", level.level, "; ",
+                "Street Cred: ", level.streetCred
+            })
+            activity.SmallImageKey = lifepath:lower()
+            activity.SmallImageText = lifepath
+            activity.State = nil
+        end
+        return true
+    end
+end
+
+local function Handler_DeathMenu(self, activity)
+    if (self.gameState == GameStates.DeathMenu) then
+        activity.Details = "Admiring the Death Menu."
+        activity.State = "No Armor?"
+        return true
+    end
+end
+
+local function Handler_Playing(self, activity)
+    if (self.gameState == GameStates.Playing) then
+        if (self.player ~= nil) then
+            local questInfo = self.GetQuest()
+            local level = self.GetLevel(self.player)
+            local lifepath = self.GetLifePath(self.player)
+            activity.Details = questInfo.name
+            activity.LargeImageKey = self.GetGender(self.player):lower()
+            activity.LargeImageText = table.concat({
+                "Level: ", level.level, "; ",
+                "Street Cred: ", level.streetCred
+            })
+            activity.SmallImageKey = lifepath:lower()
+            activity.SmallImageText = lifepath
+            activity.State = questInfo.objective
+        end
+        return true
+    end
+end
+
 function CyberpunkRPC:Init()
     self.startedAt = math.floor(os.time() * 1e3)
     self.config = self:GetDefaultConfig()
     self:LoadConfig()
+
+    self:AddActivityHandler(Handler_Playing)
+    self:AddActivityHandler(Handler_DeathMenu)
+    self:AddActivityHandler(Handler_PauseMenu)
+    self:AddActivityHandler(Handler_MainMenu)
+    self:AddActivityHandler(Handler_Loading)
+
     registerForEvent("onInit", Event_OnInit)
     registerForEvent("onUpdate", Event_OnUpdate)
     registerForEvent("onShutdown", Event_OnShutdown)
