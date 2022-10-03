@@ -24,7 +24,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 ]]
 
 local GameUI = require "libs/cetkit/GameUI"
+local Handlers = require "Handlers"
 
+---@class GameStates
 local GameStates = {
     None = 0,
     MainMenu = 1,
@@ -34,22 +36,26 @@ local GameStates = {
     Loading = 5
 }
 
+---@class CyberpunkRPC
 local CyberpunkRPC = {
     name = "CyberpunkRPC",
     version = "1.0",
     website = "https://github.com/Marco4413/Cyberpunk2077RPC",
-    ---@type PlayerPupper
-    player = nil, -- Only available in Activity Handlers
+    ---@type PlayerPupper Only available in Activity Handlers
+    player = nil,
     gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
     startedAt = 0,
     showUI = false,
+    ---@type Config
     config = { },
     applicationId = "1025361016802005022",
+    ---@type Activity
     activity = { },
     GameStates = GameStates,
-    _handlers = { }
+    _handlers = { },
+    GameUtils = require "GameUtils"
 }
 
 ---@class Activity
@@ -64,6 +70,8 @@ local CyberpunkRPC = {
 ---@field State string
 ---@field PartySize number
 ---@field PartyMax number
+
+---@alias ActivityHandler fun(rpc:CyberpunkRPC, activity:Activity):boolean|nil
 
 local function ConsoleLog(...)
     print("[ " .. os.date("%x %X") .. " ][ " .. CyberpunkRPC.name .. " ]:", table.concat({ ... }))
@@ -85,6 +93,7 @@ function CyberpunkRPC:IsEnabled()
 end
 
 function CyberpunkRPC:GetDefaultConfig()
+    ---@class Config
     return {
         enabled = true,
         rpcFile = "rpc.json",
@@ -192,89 +201,13 @@ function CyberpunkRPC:SetState(newState)
     self.gameState = newState
 end
 
-function CyberpunkRPC.GetLifePath(player)
-    if (player == nil) then return nil; end
-    local systems = Game.GetScriptableSystemsContainer()
-    local devSystem = systems:Get("PlayerDevelopmentSystem")
-    local devData = devSystem:GetDevelopmentData(player)
-    return devData ~= nil and devData:GetLifePath().value or nil
-end
-
-function CyberpunkRPC.GetLevel(player)
-    if (player == nil) then return { level = -1, streetCred = -1 }; end
-    local statsSystem = Game.GetStatsSystem()
-    local playerEntityId = player:GetEntityID()
-    local level = statsSystem:GetStatValue(playerEntityId, "Level")
-    local streetCred = statsSystem:GetStatValue(playerEntityId, "StreetCred")
-    return { level = level or -1, streetCred = streetCred or -1 }
-end
-
----@param player PlayerPuppet
-function CyberpunkRPC.GetHealthArmor(player)
-    if (player == nil) then return { health = -1, maxHealth = -1, armor = -1 }; end
-    local playerEntityId = player:GetEntityID()
-    local statsPoolSystem = Game.GetStatPoolsSystem()
-    local health = math.floor(statsPoolSystem:GetStatPoolValue(
-        playerEntityId, gamedataStatPoolType.Health, false) + .5)
-    local statsSystem = Game.GetStatsSystem()
-    local maxHealth = math.floor(statsSystem:GetStatValue(playerEntityId, "Health") + .5)
-    local armor = math.floor(statsSystem:GetStatValue(playerEntityId, "Armor") + .5)
-    return { health = health or -1, maxHealth = maxHealth or -1, armor = armor or -1 }
-end
-
----@param weapon gameweaponObject
-function CyberpunkRPC.GetWeaponName(weapon)
-    if (weapon == nil) then return nil; end
-    local weaponRecord = weapon:GetWeaponRecord()
-    if (weaponRecord == nil) then return nil; end
-    return Game.GetLocalizedTextByKey(weaponRecord:DisplayName())
-end
-
-function CyberpunkRPC.GetQuest()
-    local res = { name = "Roaming.", objective = nil }
-    local journal = Game.GetJournalManager()
-
-    -- Game Dump:
-    -- gameJournalQuestObjective[ id:02_meet_hanako, entries:Array[ handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle)], description:LocKey#9874, counter:0, optional:false, locationPrefabRef:, itemID:, districtID: ]
-    local questObjective = journal:GetTrackedEntry()
-    if (questObjective == nil or questObjective.GetDescription == nil) then return res; end
-
-    local descriptionLocKey = questObjective:GetDescription()
-    if (descriptionLocKey ~= nil) then
-        res.objective = Game.GetLocalizedText(descriptionLocKey)
-    end
-
-    -- Game Dump:
-    -- gameJournalQuestPhase[ id:q115, entries:Array[ handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle)], locationPrefabRef: ]
-    local questPhase = journal:GetParentEntry(questObjective)
-    if (questPhase == nil) then return res; end
-
-    -- Game Dump:
-    -- gameJournalQuest[ id:02_sickness, entries:Array[ handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle) handle:gameJournalEntry(RT_Handle)], title:LocKey#9860, type:MainQuest, recommendedLevelID:, districtID: ]
-    local quest = journal:GetParentEntry(questPhase)
-    if (quest == nil or quest.GetTitle == nil) then return res; end
-
-    local titleLocKey = quest:GetTitle(journal)
-    if (titleLocKey ~= nil) then
-        res.name = Game.GetLocalizedText(titleLocKey)
-    end
-
-    return res
-end
-
-function CyberpunkRPC.GetGender(player)
-    if (player == nil) then return nil; end
-    local genderName = player:GetResolvedGenderName()
-    return genderName and genderName.value or nil
-end
-
----@param handler fun(self:CyberpunkRPC, activity:Activity):boolean|nil
+---@param handler ActivityHandler
 function CyberpunkRPC:AddActivityHandler(handler)
     table.insert(self._handlers, handler)
     return handler
 end
 
----@param handler function
+---@param handler ActivityHandler
 function CyberpunkRPC:RemoveActivityHandler(handler)
     for i=#self._handlers, 1, -1 do
         if (self._handlers[i] == handler) then
@@ -420,129 +353,12 @@ local function Event_OnOverlayClose()
     CyberpunkRPC.showUI = false
 end
 
-local function Handler_Loading(self, activity)
-    if (self.gameState == GameStates.Loading) then
-        activity.Details = "Loading..."
-        return true
-    end
-end
-
-local function Handler_MainMenu(self, activity)
-    if (self.gameState == GameStates.MainMenu) then
-        activity.Details = "Watching the Main Menu."
-        return true
-    end
-end
-
-local function Handler_PauseMenu(self, activity)
-    if (self.gameState == GameStates.PauseMenu and self.player ~= nil) then
-        local level = self.GetLevel(self.player)
-        local lifepath = self.GetLifePath(self.player)
-
-        activity.Details = "Game Paused."
-        activity.LargeImageKey = self.GetGender(self.player):lower()
-        activity.LargeImageText = table.concat({
-            "Level: ", level.level, "; ",
-            "Street Cred: ", level.streetCred
-        })
-        activity.SmallImageKey = lifepath:lower()
-        activity.SmallImageText = lifepath
-        activity.State = nil
-        return true
-    end
-end
-
-local function Handler_DeathMenu(self, activity)
-    if (self.gameState == GameStates.DeathMenu) then
-        activity.Details = "Admiring the Death Menu."
-        activity.State = "No Armor?"
-        return true
-    end
-end
-
-local function Handler_Combat(self, activity)
-    if (not self.config.showCombatActivity) then return; end
-    if (self.gameState == GameStates.Playing and self.player ~= nil and Game.GetPlayer():IsInCombat()) then
-        local level = self.GetLevel(self.player)
-        local lifepath = self.GetLifePath(self.player)
-        local healthArmor = self.GetHealthArmor(self.player)
-        local weaponName = self.GetWeaponName(Game.GetPlayer():GetActiveWeapon())
-        
-        activity.Details = "Fighting with " .. healthArmor.health .. "/" .. healthArmor.maxHealth .. "HP"
-        activity.LargeImageKey = self.GetGender(self.player):lower()
-        activity.LargeImageText = table.concat({
-            "Level: ", level.level, "; ",
-            "Street Cred: ", level.streetCred
-        })
-        activity.SmallImageKey = lifepath:lower()
-        activity.SmallImageText = lifepath
-        activity.State = weaponName and ("Using " .. weaponName) or "No weapon equipped."
-        return true
-    end
-end
-
-local function Handler_Driving(self, activity)
-    if (not self.config.showDrivingActivity) then return; end
-    if (self.gameState == GameStates.Playing and self.player ~= nil) then
-        local vehicle = Game.GetMountedVehicle(self.player)
-        if (vehicle ~= nil and vehicle:IsPlayerDriver()) then
-            local level = self.GetLevel(self.player)
-            local lifepath = self.GetLifePath(self.player)
-            local vehicleName = vehicle:GetDisplayName()
-            local vehicleSpeed = math.floor(vehicle:GetCurrentSpeed() * 3.6 + .5)
-            
-            activity.Details = "Driving " .. vehicleName .. "."
-            activity.LargeImageKey = self.GetGender(self.player):lower()
-            activity.LargeImageText = table.concat({
-                "Level: ", level.level, "; ",
-                "Street Cred: ", level.streetCred
-            })
-            activity.SmallImageKey = lifepath:lower()
-            activity.SmallImageText = lifepath
-
-            if (vehicleSpeed > 0) then
-                activity.State = "Cruising at " .. vehicleSpeed .. "km/h"
-            elseif (vehicleSpeed < 0) then
-                activity.State = "Going backwards at " .. -vehicleSpeed .. "km/h"
-            else
-                activity.State = "Currently parked."
-            end
-            return true
-        end
-    end
-end
-
-local function Handler_Playing(self, activity)
-    if (self.gameState == GameStates.Playing and self.player ~= nil) then
-        local questInfo = self.GetQuest()
-        local level = self.GetLevel(self.player)
-        local lifepath = self.GetLifePath(self.player)
-
-        activity.Details = questInfo.name
-        activity.LargeImageKey = self.GetGender(self.player):lower()
-        activity.LargeImageText = table.concat({
-            "Level: ", level.level, "; ",
-            "Street Cred: ", level.streetCred
-        })
-        activity.SmallImageKey = lifepath:lower()
-        activity.SmallImageText = lifepath
-        activity.State = questInfo.objective
-        return true
-    end
-end
-
 function CyberpunkRPC:Init()
     self.startedAt = math.floor(os.time() * 1e3)
     self.config = self:GetDefaultConfig()
     self:LoadConfig()
 
-    self:AddActivityHandler(Handler_Playing)
-    self:AddActivityHandler(Handler_Combat)
-    self:AddActivityHandler(Handler_Driving)
-    self:AddActivityHandler(Handler_DeathMenu)
-    self:AddActivityHandler(Handler_PauseMenu)
-    self:AddActivityHandler(Handler_MainMenu)
-    self:AddActivityHandler(Handler_Loading)
+    Handlers:RegisterHandlers(CyberpunkRPC)
 
     registerForEvent("onInit", Event_OnInit)
     registerForEvent("onUpdate", Event_OnUpdate)
