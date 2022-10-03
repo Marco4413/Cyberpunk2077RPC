@@ -44,6 +44,7 @@ end
 ---@param activity Activity
 function Handlers.DeathMenu(self, activity)
     if (self.gameState == self.GameStates.DeathMenu) then
+        activity.LargeImageKey = "deathmenu"
         activity.Details = "Admiring the Death Menu."
         activity.State = "No Armor?"
         return true
