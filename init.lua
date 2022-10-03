@@ -38,7 +38,8 @@ local CyberpunkRPC = {
     name = "CyberpunkRPC",
     version = "1.0",
     website = "https://github.com/Marco4413/Cyberpunk2077RPC",
-    player = Game.GetPlayer(), -- Only available in Activity Handlers
+    ---@type PlayerPupper
+    player = nil, -- Only available in Activity Handlers
     gameState = GameStates.MainMenu,
     _isActivityDirty = true,
     elapsedInterval = 0,
@@ -247,13 +248,13 @@ end
 
 ---@param handler fun(self:CyberpunkRPC, activity:Activity):boolean|nil
 function CyberpunkRPC:AddActivityHandler(handler)
-    table.insert(self._handlers, 1, handler)
+    table.insert(self._handlers, handler)
     return handler
 end
 
 ---@param handler function
 function CyberpunkRPC:RemoveActivityHandler(handler)
-    for i=1, #self._handlers do
+    for i=#self._handlers, 1, -1 do
         if (self._handlers[i] == handler) then
             table.remove(self._handlers, i)
             break
@@ -319,7 +320,7 @@ local function Event_OnUpdate(dt)
         }
 
         CyberpunkRPC.player = Game.GetPlayer()
-        for i=1, #CyberpunkRPC._handlers do
+        for i=#CyberpunkRPC._handlers, 1, -1 do
             if (CyberpunkRPC._handlers[i](CyberpunkRPC, activity)) then
                 break
             end
