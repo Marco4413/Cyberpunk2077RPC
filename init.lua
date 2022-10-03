@@ -90,7 +90,8 @@ function CyberpunkRPC:GetDefaultConfig()
         rpcFile = "rpc.json",
         submitInterval = 5,
         showWebsiteButton = false,
-        showDrivingActivity = false
+        showDrivingActivity = false,
+        showCombatActivity = false
     }
 end
 
@@ -206,6 +207,27 @@ function CyberpunkRPC.GetLevel(player)
     local level = statsSystem:GetStatValue(playerEntityId, "Level")
     local streetCred = statsSystem:GetStatValue(playerEntityId, "StreetCred")
     return { level = level or -1, streetCred = streetCred or -1 }
+end
+
+---@param player PlayerPuppet
+function CyberpunkRPC.GetHealthArmor(player)
+    if (player == nil) then return { health = -1, maxHealth = -1, armor = -1 }; end
+    local playerEntityId = player:GetEntityID()
+    local statsPoolSystem = Game.GetStatPoolsSystem()
+    local health = math.floor(statsPoolSystem:GetStatPoolValue(
+        playerEntityId, gamedataStatPoolType.Health, false) + .5)
+    local statsSystem = Game.GetStatsSystem()
+    local maxHealth = math.floor(statsSystem:GetStatValue(playerEntityId, "Health") + .5)
+    local armor = math.floor(statsSystem:GetStatValue(playerEntityId, "Armor") + .5)
+    return { health = health or -1, maxHealth = maxHealth or -1, armor = armor or -1 }
+end
+
+---@param weapon gameweaponObject
+function CyberpunkRPC.GetWeaponName(weapon)
+    if (weapon == nil) then return nil; end
+    local weaponRecord = weapon:GetWeaponRecord()
+    if (weaponRecord == nil) then return nil; end
+    return Game.GetLocalizedTextByKey(weaponRecord:DisplayName())
 end
 
 function CyberpunkRPC.GetQuest()
@@ -378,6 +400,9 @@ local function Event_OnDraw()
         
         local newValue, changed = ImGui.Checkbox("Show Driving Activity", CyberpunkRPC.config.showDrivingActivity)
         if (changed) then CyberpunkRPC.config.showDrivingActivity = newValue; end
+        
+        local newValue, changed = ImGui.Checkbox("Show Combat Activity", CyberpunkRPC.config.showCombatActivity)
+        if (changed) then CyberpunkRPC.config.showCombatActivity = newValue; end
         ImGui.Separator()
 
         -- This may cause issues if not done only on box presses
@@ -431,6 +456,27 @@ local function Handler_DeathMenu(self, activity)
     if (self.gameState == GameStates.DeathMenu) then
         activity.Details = "Admiring the Death Menu."
         activity.State = "No Armor?"
+        return true
+    end
+end
+
+local function Handler_Combat(self, activity)
+    if (not self.config.showCombatActivity) then return; end
+    if (self.gameState == GameStates.Playing and self.player ~= nil and Game.GetPlayer():IsInCombat()) then
+        local level = self.GetLevel(self.player)
+        local lifepath = self.GetLifePath(self.player)
+        local healthArmor = self.GetHealthArmor(self.player)
+        local weaponName = self.GetWeaponName(Game.GetPlayer():GetActiveWeapon())
+        
+        activity.Details = "Fighting with " .. healthArmor.health .. "/" .. healthArmor.maxHealth .. "HP"
+        activity.LargeImageKey = self.GetGender(self.player):lower()
+        activity.LargeImageText = table.concat({
+            "Level: ", level.level, "; ",
+            "Street Cred: ", level.streetCred
+        })
+        activity.SmallImageKey = lifepath:lower()
+        activity.SmallImageText = lifepath
+        activity.State = weaponName and ("Using " .. weaponName) or "No weapon equipped."
         return true
     end
 end
@@ -491,6 +537,7 @@ function CyberpunkRPC:Init()
     self:LoadConfig()
 
     self:AddActivityHandler(Handler_Playing)
+    self:AddActivityHandler(Handler_Combat)
     self:AddActivityHandler(Handler_Driving)
     self:AddActivityHandler(Handler_DeathMenu)
     self:AddActivityHandler(Handler_PauseMenu)
