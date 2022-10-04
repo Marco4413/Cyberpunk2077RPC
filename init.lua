@@ -39,7 +39,7 @@ local GameStates = {
 ---@class CyberpunkRPC
 local CyberpunkRPC = {
     name = "CyberpunkRPC",
-    version = "1.0",
+    version = "1.1",
     website = "https://github.com/Marco4413/Cyberpunk2077RPC",
     ---@type PlayerPupper Only available in Activity Handlers
     player = nil,
